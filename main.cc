@@ -34,97 +34,111 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+
+#include <Eigen/Eigen>
+#include <boost/progress.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+
 #include "quadprogpp/QuadProg++.hh"
+#include "quadprog_eigen/quadprog_eigen.hh"
+#include "EigenQP/EigenQP.h"
+
+namespace btime = boost::posix_time;
 
 int main (int argc, char *const argv[]) {
-  quadprogpp::Matrix<double> G, CE, CI;
-  quadprogpp::Vector<double> g0, ce0, ci0, x;
-	int n, m, p;
-	double sum = 0.0;
-	char ch;
-  
-  n = 2;
-  G.resize(n, n);
+  constexpr int n = 2;
+  constexpr int m = 1;
+  constexpr int p = 3;
+
+  constexpr double GInput[n * n] = {4, -2, -2, 4};
+
+  constexpr double CEInput[n * m] = {1, 1};
+
+  constexpr double CIInput[n * p] = {1.0, 0.0, 1.0, 0.0, 1.0, 1.0};
+
+  constexpr double g0Input[n] = {6.0, 0.0};
+
+  constexpr double ce0Input[m] = {-3.0};
+
+  constexpr double ci0Input[p] = {0.0, 0.0, -2.0};
+
+  constexpr double x0Input[n] = {0.0, 0.0};
+
+  // Initialize the matrix to pass to quadprog solver.
+  quadprogpp::Matrix<double> G(GInput, n, n);
+  quadprogpp::Matrix<double> CE(CEInput, n, m);
+  quadprogpp::Matrix<double> CI(CIInput, n, p);
+
+  quadprogpp::Vector<double> g0(g0Input, n);
+  quadprogpp::Vector<double> ce0(ce0Input, m);
+  quadprogpp::Vector<double> ci0(ci0Input, p);
+  quadprogpp::Vector<double> x(x0Input, n);
+
+  int count = 1000000;
+
+  btime::ptime tic = btime::microsec_clock::local_time();
+  //boost::timer timer;
+  // Does this modify H?
+  double objVal;
+  for (int i = 0; i < count; ++i)
   {
-		std::istringstream is("4, -2,"
-													"-2, 4 ");
-
-		for (int i = 0; i < n; i++)	
-			for (int j = 0; j < n; j++)
-				is >> G[i][j] >> ch;
-	}
-	
-  g0.resize(n);
-  {
-		std::istringstream is("6.0, 0.0 ");
-
-		for (int i = 0; i < n; i++)
-			is >> g0[i] >> ch;
-	}
-  
-  m = 1;
-  CE.resize(n, m);
-	{
-		std::istringstream is("1.0, "
-													"1.0 ");
-
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < m; j++)
-				is >> CE[i][j] >> ch;
-	} 
-  
-  ce0.resize(m);
-	{
-		std::istringstream is("-3.0 ");
-		
-		for (int j = 0; j < m; j++)
-			is >> ce0[j] >> ch;
+	objVal = quadprogpp::solve_quadprog(G, g0, CE, ce0, CI, ci0, x);
   }
-	
-	p = 3;
-  CI.resize(n, p);
-  {
-		std::istringstream is("1.0, 0.0, 1.0, "
-													"0.0, 1.0, 1.0 ");
+  btime::time_duration toc = btime::microsec_clock::local_time() - tic;
+  std::cout << "Elapsed time of quadprogpp: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
+  std::cout << "obj: " << objVal << "\nx: " << x << "\n\n";
   
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < p; j++)
-				is >> CI[i][j] >> ch;
-	}
-  
-  ci0.resize(p);
-  {
-		std::istringstream is("0.0, 0.0, -2.0 ");
 
-		for (int j = 0; j < p; j++)
-			is >> ci0[j] >> ch;
-	}
-  x.resize(n);
+  // Initialize the matrix to pass to quadprog solver.
+  Eigen::MatrixXd eG(n, n);
+  Eigen::MatrixXd eCE(n, m);
+  Eigen::MatrixXd eCI(n, p);
 
-  std::cout << "f: " << solve_quadprog(G, g0, CE, ce0, CI, ci0, x) << std::endl;
-	std::cout << "x: " << x << std::endl;
-/*  for (int i = 0; i < n; i++)
-    std::cout << x[i] << ' ';
-	std::cout << std::endl;	 */
+  Eigen::VectorXd eg0(n), ece0(m), eci0(p), ex(n);
 
-	/* FOR DOUBLE CHECKING COST since in the solve_quadprog routine the matrix G is modified */
-	
-	{
-    std::istringstream is("4, -2,"
-													"-2, 4 ");
-	
-		for (int i = 0; i < n; i++)
-			for (int j = 0; j < n; j++)
-				is >> G[i][j] >> ch;
-	}
-	
-  std::cout << "Double checking cost: ";
-	for (int i = 0; i < n; i++)
-		for (int j = 0; j < n; j++)
-			sum += x[i] * G[i][j] * x[j];
-	sum *= 0.5;	
-	
-	for (int i = 0; i < n; i++)
-		sum += g0[i] * x[i];
-	std::cout << sum << std::endl;
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+      eG(i, j) = GInput[i * n + j];
+    }
+    eg0(i) = g0Input[i];
+    ex(i) = x0Input[i];
+  }
+
+  for (int i = 0; i < n; i++) {
+    for (int j = 0; j < m; j++) {
+      eCE(i, j) = CEInput[i * m + j];
+    }
+  }
+
+  for (int i = 0; i < m; i++) {
+    ece0(i) = ce0Input[i];
+  }
+
+  for (int s = 0; s < n; s++) {
+    for (int j = 0; j < p; j++) {
+      eCI(s, j) = CIInput[s * p + j];
+    }
+  }
+
+  for (int i = 0; i < p; i++) {
+    eci0(i) = ci0Input[i];
+  }
+
+  tic = btime::microsec_clock::local_time();
+  for (int i = 0; i < count; ++i) {
+  	ex.setZero();
+    objVal = QP::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex);
+  }
+  toc = btime::microsec_clock::local_time() - tic;
+  std::cout << "Elapsed time of eigen QP: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
+  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+
+  tic = btime::microsec_clock::local_time();
+  for (int i = 0; i < count; ++i) {
+  	ex.setZero();
+    objVal = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex);
+  }
+  toc = btime::microsec_clock::local_time() - tic;
+  std::cout << "Elapsed time of quadprog eigen: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
+  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
 }

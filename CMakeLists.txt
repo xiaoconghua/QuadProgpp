@@ -11,9 +11,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 add_library(quadprogpp_libs src/quadprogpp/QuadProg++.cc)
 add_library(quadprog_eigen_libs src/quadprog_eigen/quadprog_eigen.cc)
+add_library(eigen_qp_libs src/EigenQP/EigenQP.cc)
 
 add_executable(quadprog_test main.cc)
-target_link_libraries(quadprog_test PUBLIC Eigen3::Eigen quadprog_eigen_libs quadprogpp_libs)
+target_link_libraries(quadprog_test PUBLIC Eigen3::Eigen quadprog_eigen_libs quadprogpp_libs eigen_qp_libs)
 
 
 ###############################################################################

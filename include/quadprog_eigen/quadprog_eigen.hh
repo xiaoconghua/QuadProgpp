@@ -1,3 +1,4 @@
+#pragma once
 /*
  File $Id: QuadProg++.hh 232 2007-06-21 12:29:00Z digasper $ 
  
@@ -59,8 +60,8 @@ s.t.
 */
 
 
-#ifndef _QUADPROGPP
-#define _QUADPROGPP
+#ifndef _QUADPROGEIGEN
+#define _QUADPROGEIGEN
 
 #include <Eigen/Eigen>
 
@@ -71,6 +72,6 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0,
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, 
                       Eigen::VectorXd& x);
 
-}  // namespace quadprogpp
+}  // namespace quadprog_eigen
 
-#endif // #define _QUADPROGPP
+#endif // #define _QUADPROGEIGEN

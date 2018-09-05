@@ -1,3 +1,4 @@
+#pragma once
 /*
  File $Id: QuadProg++.hh 232 2007-06-21 12:29:00Z digasper $ 
  

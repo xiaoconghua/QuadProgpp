@@ -133,11 +133,27 @@ int main (int argc, char *const argv[]) {
   std::cout << "Elapsed time of eigen QP: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
   std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
 
+  quadprog_eigen::SolverFlag solver_flag;
   tic = btime::microsec_clock::local_time();
   for (int i = 0; i < count; ++i) {
   	ex.setZero();
-    objVal = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex);
+    solver_flag = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex, objVal);
   }
+  switch(solver_flag) {
+    case quadprog_eigen::SolverFlag::kReachMaxIter:
+      std::cout << "Reaches Maximum Iteration." << std::endl;
+      break;
+    case quadprog_eigen::SolverFlag::kSolveSuccess:
+      std::cout << "Solve Success." << std::endl;
+      break;
+    case quadprog_eigen::SolverFlag::kInfeasibleConstr:
+      std::cout << "Infeasible Constraints." << std::endl;
+      break;
+    case quadprog_eigen::SolverFlag::kLinearConstr:
+      std::cout << "Infeasible Constraints." << std::endl;
+      break;
+  }
+
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprog eigen: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
   std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";

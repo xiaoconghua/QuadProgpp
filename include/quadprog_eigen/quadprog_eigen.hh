@@ -67,10 +67,20 @@ s.t.
 
 namespace quadprog_eigen {
 
-double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, 
+constexpr int MaxIteration = 20;
+constexpr double MaxConstrTol = 1e-8;
+
+enum class SolverFlag {
+  kReachMaxIter = 0,
+  kSolveSuccess = 1,
+  kInfeasibleConstr = -1,
+  kLinearConstr = -2,
+};
+
+SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0,
                       const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,  
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, 
-                      Eigen::VectorXd& x);
+                      Eigen::VectorXd& x, double& f_value);
 
 }  // namespace quadprog_eigen
 

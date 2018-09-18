@@ -50,8 +50,8 @@ void print_matrix(const char* name, const Eigen::MatrixXd& A, int n = -1, int m 
 
 // The Solving function, implementing the Goldfarb-Idnani method
 
-double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
-                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, Eigen::VectorXd& x) {
+SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
+                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, Eigen::VectorXd& x, double& f_value) {
   std::ostringstream msg;
   int n = G.cols(), p = CE.cols(), m = CI.cols();
   if (G.rows() != n)
@@ -84,7 +84,7 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
   int ip;                  // this is the index of the constraint to be added to the active set
   Eigen::MatrixXd R(n, n), J(n, n);
   Eigen::VectorXd s(m + p), z(n), r(m + p), d(n), np(n), u(m + p), x_old(n), u_old(m + p);
-  double f_value, psi, c1, c2, sum, ss, R_norm;
+  double psi, c1, c2, sum, ss, R_norm;
   double inf;
   if (std::numeric_limits<double>::has_infinity) {
     inf = std::numeric_limits<double>::infinity();
@@ -180,7 +180,7 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
     /* compute full step length t2: i.e., the minimum step in primal space s.t. the contraint 
       becomes feasible */
     t2 = 0.0;
-    if (fabs(z.norm()) > std::numeric_limits<double>::epsilon()) {  // i.e. z != 0
+    if (fabs(z.norm()) > MaxConstrTol) {  // i.e. z != 0
       t2 = (-np.dot(x) - ce0(i)) / z.dot(np);
     }
 
@@ -198,7 +198,7 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
     if (!add_constraint(R, J, d, iq, R_norm)) {
       // Equality constraints are linearly dependent
       throw std::runtime_error("Constraints are linearly dependent");
-      return f_value;
+      return SolverFlag::kLinearConstr;
     }
   }
 
@@ -207,6 +207,9 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
 
 l1:
   iter++;
+  if (MaxIteration > 0 && iter > MaxIteration) {
+    return SolverFlag::kReachMaxIter;
+  }
 #ifdef TRACE_SOLVER
   print_vector("x", x);
 #endif
@@ -232,11 +235,11 @@ l1:
   print_vector("s", s, m);
 #endif
 
-  if (fabs(psi) <= m * std::numeric_limits<double>::epsilon() * c1 * c2 * 100.0) {
+  if (fabs(psi) <= m * MaxConstrTol * c1 * c2 * 100.0) {
     /* numerically there are not infeasibilities anymore */
     // q = iq;
 
-    return f_value;
+    return SolverFlag::kSolveSuccess;
   }
 
   /* save old values for u and A */
@@ -257,7 +260,7 @@ l2: /* Step 2: check for feasibility and determine a new S-pair */
   if (ss >= 0.0) {
     // q = iq;
 
-    return f_value;
+    return SolverFlag::kInfeasibleConstr;
   }
   
   /* set np = n(ip) */
@@ -301,7 +304,7 @@ l2a:/* Step 2a: determine step direction */
     }
   }
   /* Compute t2: full step length (minimum step in primal space such that the constraint ip becomes feasible */
-  if (fabs(scalar_product(z, z))  > std::numeric_limits<double>::epsilon()) // i.e. z != 0
+  if (fabs(scalar_product(z, z))  > MaxConstrTol) // i.e. z != 0
   {
     t2 = -s(ip) / scalar_product(z, np);
     if (t2 < 0) // patch suggested by Takano Akio for handling numerical inconsistencies
@@ -323,7 +326,7 @@ l2a:/* Step 2a: determine step direction */
     /* QPP is infeasible */
     // FIXME: unbounded to raise
     // q = iq;
-    return inf;
+    return SolverFlag::kInfeasibleConstr;
   }
   /* case (ii): step in dual space */
   if (t2 >= inf) {
@@ -360,7 +363,7 @@ l2a:/* Step 2a: determine step direction */
   print_vector("A", A, iq + 1);
 #endif
   
-  if (fabs(t - t2) < std::numeric_limits<double>::epsilon())
+  if (fabs(t - t2) < MaxConstrTol)
   {
 #ifdef TRACE_SOLVER
     std::cout << "Full step has taken " << t << std::endl;

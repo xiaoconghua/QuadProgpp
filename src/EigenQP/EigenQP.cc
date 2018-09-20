@@ -69,7 +69,7 @@ double distance(double a, double b);
 void print_matrix(const char* name, const Eigen::MatrixXd& A, int n = -1, int m = -1);
 
 // template<typename T>
-// void print_vector(const char* name, const ublas::vector<T>& v, int n = -1);
+void print_vector(const char* name, const Eigen::VectorXd& v, int n = -1);
 
 // The Solving function, implementing the Goldfarb-Idnani method
 
@@ -135,15 +135,15 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
 
 /* p is the number of equality constraints */
 /* m is the number of inequality constraints */
-#ifdef TRACE_SOLVER
-  std::cout << std::endl << "Starting solve_quadprog" << std::endl;
-  print_ublas::matrix("G", G);
-  print_ublas::vector("g0", g0);
-  print_ublas::matrix("CE", CE);
-  print_ublas::vector("ce0", ce0);
-  print_ublas::matrix("CI", CI);
-  print_ublas::vector("ci0", ci0);
-#endif
+// #ifdef TRACE_SOLVER
+//   std::cout << std::endl << "Starting solve_quadprog" << std::endl;
+//   print_matrix("G", G);
+//   print_vector("g0", g0);
+//   print_matrix("CE", CE);
+//   print_vector("ce0", ce0);
+//   print_matrix("CI", CI);
+//   print_vector("ci0", ci0);
+// #endif
 
   /*
    * Preprocessing phase
@@ -176,7 +176,9 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
     d(i) = 0.0;
   }
 #ifdef TRACE_SOLVER
-  print_ublas::matrix("J", J);
+  print_matrix("J", J);
+  print_vector("d", d);
+  print_matrix("R", R);
 #endif
 
   /* c1 * c2 is an estimate for cond(G) */
@@ -192,7 +194,7 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
   f_value = 0.5 * scalar_product(g0, x);
 #ifdef TRACE_SOLVER
   std::cout << "Unconstrained solution: " << f_value << std::endl;
-  print_ublas::vector("x", x);
+  print_vector("x", x);
 #endif
 
   /* Add equality constraints to the working set A */
@@ -203,10 +205,10 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
     update_z(z, J, d, iq);
     update_r(R, r, d, iq);
 #ifdef TRACE_SOLVER
-    print_ublas::matrix("R", R, n, iq);
-    print_ublas::vector("z", z);
-    print_ublas::vector("r", r, iq);
-    print_ublas::vector("d", d);
+    print_matrix("R", R, n, iq);
+    print_vector("z", z);
+    print_vector("r", r, iq);
+    print_vector("d", d);
 #endif
 
     /* compute full step length t2: i.e., the minimum step in primal space s.t. the contraint
@@ -239,7 +241,7 @@ double solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::Matr
 l1:
   iter++;
 #ifdef TRACE_SOLVER
-  print_ublas::vector("x", x);
+  print_vector("x", x);
 #endif
   /* step 1: choose a violated constraint */
   for (i = p; i < iq; i++) {
@@ -260,7 +262,7 @@ l1:
     psi += std::min(0.0, sum);
   }
 #ifdef TRACE_SOLVER
-  print_ublas::vector("s", s, m);
+  print_vector("s", s, m);
 #endif
 
   if (fabs(psi) <= m * std::numeric_limits<double>::epsilon() * c1 * c2 * 100.0) {
@@ -300,7 +302,7 @@ l2: /* Step 2: check for feasibility and determine a new S-pair */
 
 #ifdef TRACE_SOLVER
   std::cout << "Trying with constraint " << ip << std::endl;
-  print_ublas::vector("np", np);
+  print_vector("np", np);
 #endif
 
 l2a: /* Step 2a: determine step direction */
@@ -309,14 +311,14 @@ l2a: /* Step 2a: determine step direction */
   update_z(z, J, d, iq);
   /* compute N* np (if q > 0): the negative of the step direction in the dual space */
   update_r(R, r, d, iq);
-#ifdef TRACE_SOLVER
-  std::cout << "Step direction z" << std::endl;
-  print_ublas::vector("z", z);
-  print_ublas::vector("r", r, iq + 1);
-  print_ublas::vector("u", u, iq + 1);
-  print_ublas::vector("d", d);
-  print_ublas::vector("A", A, iq + 1);
-#endif
+// #ifdef TRACE_SOLVER
+//   std::cout << "Step direction z" << std::endl;
+//   print_vector("z", z);
+//   print_vector("r", r, iq + 1);
+//   print_vector("u", u, iq + 1);
+//   print_vector("d", d);
+//   print_vector("A", A, iq + 1);
+// #endif
 
   /* Step 2b: compute step length */
   l = 0;
@@ -359,12 +361,12 @@ l2a: /* Step 2a: determine step direction */
     u(iq) += t;
     iai(l) = l;
     delete_constraint(R, J, A, u, n, p, iq, l);
-#ifdef TRACE_SOLVER
-    std::cout << " in dual space: " << f_value << std::endl;
-    print_ublas::vector("x", x);
-    print_ublas::vector("z", z);
-    print_ublas::vector("A", A, iq + 1);
-#endif
+// #ifdef TRACE_SOLVER
+//     std::cout << " in dual space: " << f_value << std::endl;
+//     print_vector("x", x);
+//     print_vector("z", z);
+//     print_vector("A", A, iq + 1);
+// #endif
     goto l2a;
   }
 
@@ -377,29 +379,29 @@ l2a: /* Step 2a: determine step direction */
   /* u = u + t * (-r 1) */
   for (k = 0; k < iq; k++) u(k) -= t * r(k);
   u(iq) += t;
-#ifdef TRACE_SOLVER
-  std::cout << " in both spaces: " << f_value << std::endl;
-  print_ublas::vector("x", x);
-  print_ublas::vector("u", u, iq + 1);
-  print_ublas::vector("r", r, iq + 1);
-  print_ublas::vector("A", A, iq + 1);
-#endif
+// #ifdef TRACE_SOLVER
+//   std::cout << " in both spaces: " << f_value << std::endl;
+//   print_vector("x", x);
+//   print_vector("u", u, iq + 1);
+//   print_vector("r", r, iq + 1);
+//   print_vector("A", A, iq + 1);
+// #endif
 
   if (fabs(t - t2) < std::numeric_limits<double>::epsilon()) {
 #ifdef TRACE_SOLVER
     std::cout << "Full step has taken " << t << std::endl;
-    print_ublas::vector("x", x);
+    print_vector("x", x);
 #endif
     /* full step has taken */
     /* add constraint ip to the active set*/
     if (!add_constraint(R, J, d, iq, R_norm)) {
       iaexcl[ip] = false;
       delete_constraint(R, J, A, u, n, p, iq, ip);
-#ifdef TRACE_SOLVER
-      print_ublas::matrix("R", R);
-      print_ublas::vector("A", A, iq);
-      print_ublas::vector("iai", iai);
-#endif
+// #ifdef TRACE_SOLVER
+//       print_matrix("R", R);
+//       print_vector("A", A, iq);
+//       print_vector("iai", iai);
+// #endif
       for (i = 0; i < m; i++) iai(i) = i;
       for (i = p; i < iq; i++) {
         A(i) = A_old(i);
@@ -411,25 +413,25 @@ l2a: /* Step 2a: determine step direction */
     } else {
       iai(ip) = -1;
     }
-#ifdef TRACE_SOLVER
-    print_ublas::matrix("R", R);
-    print_ublas::vector("A", A, iq);
-    print_ublas::vector("iai", iai);
-#endif
+// #ifdef TRACE_SOLVER
+//     print_matrix("R", R);
+//     print_vector("A", A, iq);
+//     print_vector("iai", iai);
+// #endif
     goto l1;
   }
 
 /* a patial step has taken */
 #ifdef TRACE_SOLVER
   std::cout << "Partial step has taken " << t << std::endl;
-  print_ublas::vector("x", x);
+  print_vector("x", x);
 #endif
   /* drop constraint l */
   iai(l) = l;
   delete_constraint(R, J, A, u, n, p, iq, l);
 #ifdef TRACE_SOLVER
-  print_ublas::matrix("R", R);
-  print_ublas::vector("A", A, iq);
+  print_matrix("R", R);
+  // print_vector("A", A, iq);
 #endif
 
   /* update s(ip) = CI * x + ci0 */
@@ -437,9 +439,9 @@ l2a: /* Step 2a: determine step direction */
   for (k = 0; k < n; k++) sum += CI(k, ip) * x(k);
   s(ip) = sum + ci0(ip);
 
-#ifdef TRACE_SOLVER
-  print_ublas::vector("s", s, m);
-#endif
+// #ifdef TRACE_SOLVER
+//   print_vector("s", s, m);
+// #endif
   goto l2a;
 }
 
@@ -529,9 +531,9 @@ bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, 
   for (i = 0; i < iq; i++) R(i, iq - 1) = d(i);
 #ifdef TRACE_SOLVER
   std::cout << iq << std::endl;
-  print_ublas::matrix("R", R, iq, iq);
-  print_ublas::matrix("J", J);
-  print_ublas::vector("d", d, iq);
+  print_matrix("R", R, iq, iq);
+  print_matrix("J", J);
+  print_vector("d", d, iq);
 #endif
 
   if (fabs(d(iq - 1)) <= std::numeric_limits<double>::epsilon() * R_norm) {
@@ -708,6 +710,25 @@ void print_matrix(const char* name, const Eigen::MatrixXd& A, int n, int m) {
 
   std::cout << t << std::endl;
 }
+
+void print_vector(const char* name, const Eigen::VectorXd& v, int n)
+{
+ std::ostringstream s;
+ std::string t;
+ if ((n == -1) || (n > v.size()))
+   n = v.size();
+
+ s << name << ": " << std::endl << " ";
+ for (int i = 0; i < n; i++)
+ {
+   s << v(i) << ", ";
+ }
+ t = s.str();
+ t = t.substr(0, t.size() - 2); // To remove the trailing space and comma
+
+ std::cout << t << std::endl;
+}
+
 }  // namespace QP
 
 // /*

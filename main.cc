@@ -74,7 +74,7 @@ int main (int argc, char *const argv[]) {
   quadprogpp::Vector<double> ci0(ci0Input, p);
   quadprogpp::Vector<double> x(x0Input, n);
 
-  int count = 1000000;
+  int count = 10000;
 
   btime::ptime tic = btime::microsec_clock::local_time();
   //boost::timer timer;
@@ -124,18 +124,16 @@ int main (int argc, char *const argv[]) {
     eci0(i) = ci0Input[i];
   }
 
-  tic = btime::microsec_clock::local_time();
-  for (int i = 0; i < count; ++i) {
-  	ex.setZero();
-    objVal = QP::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex);
-  }
-  toc = btime::microsec_clock::local_time() - tic;
-  std::cout << "Elapsed time of eigen QP: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
-
   quadprog_eigen::SolverFlag solver_flag;
   tic = btime::microsec_clock::local_time();
   for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < n; j++) {
+        eG(i, j) = GInput[i * n + j];
+      }
+      eg0(i) = g0Input[i];
+      ex(i) = x0Input[i];
+    }
   	ex.setZero();
     solver_flag = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex, objVal);
   }
@@ -156,5 +154,21 @@ int main (int argc, char *const argv[]) {
 
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprog eigen: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
+  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+
+  tic = btime::microsec_clock::local_time();
+  for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < n; j++) {
+        eG(i, j) = GInput[i * n + j];
+      }
+      eg0(i) = g0Input[i];
+      ex(i) = x0Input[i];
+    }
+    ex.setZero();
+    objVal = QP::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex);
+  }
+  toc = btime::microsec_clock::local_time() - tic;
+  std::cout << "Elapsed time of eigen QP: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
   std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
 }

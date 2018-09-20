@@ -16,6 +16,9 @@ add_library(eigen_qp_libs src/EigenQP/EigenQP.cc)
 add_executable(quadprog_test main.cc)
 target_link_libraries(quadprog_test PUBLIC Eigen3::Eigen quadprog_eigen_libs quadprogpp_libs eigen_qp_libs)
 
+add_executable(speed_test speed_test.cc)
+target_link_libraries(speed_test PUBLIC Eigen3::Eigen quadprog_eigen_libs quadprogpp_libs eigen_qp_libs)
+
 
 ###############################################################################
 ## packaging ##################################################################

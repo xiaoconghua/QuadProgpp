@@ -19,37 +19,77 @@ File $Id: QuadProg++.cc 232 2007-06-21 12:29:00Z digasper $
 #include <stdexcept>
 #include <Eigen/Dense>
 #include "quadprog_eigen/quadprog_eigen.hh"
-//#define TRACE_SOLVER
+// #define TRACE_SOLVER
 
 namespace quadprog_eigen {
 
+constexpr int MaxIteration = 20;
+constexpr double MaxConstrTol = 1e-16;
+
+inline double distance(double a, double b) {
+  register double a1, b1, t;
+  a1 = fabs(a);
+  b1 = fabs(b);
+  if (a1 > b1) {
+    t = (b1 / a1);
+    return a1 * sqrt(1.0 + t * t);
+  }
+  else
+    if (b1 > a1)
+    {
+      t = (a1 / b1);
+      return b1 * sqrt(1.0 + t * t);
+    }
+  return a1 * sqrt(2.0);
+}
+
 // Utility functions for updating some data needed by the solution method 
-void compute_d(Eigen::VectorXd& d, const Eigen::MatrixXd& J, const Eigen::VectorXd& np);
-void update_z(Eigen::VectorXd& z, const Eigen::MatrixXd& J, const Eigen::VectorXd& d, int iq);
-void update_r(const Eigen::MatrixXd& R, Eigen::VectorXd& r, const Eigen::VectorXd& d, int iq);
-bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, int& iq, double& rnorm);
-void delete_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXi& A, Eigen::VectorXd& u, int n, int p, int& iq, int l);
+inline void compute_d(Eigen::VectorXd& d, const Eigen::MatrixXd& J, const Eigen::VectorXd& np) {
+  // d = J.adjoint() * np;
+  register int i, j, n = d.size();
+  register double sum;
 
-// Utility functions for computing the Cholesky decomposition and solving
-// linear systems
-void cholesky_decomposition(Eigen::MatrixXd& A);
-void cholesky_solve(const Eigen::MatrixXd& L, Eigen::VectorXd& x, const Eigen::VectorXd& b);
-void forward_elimination(const Eigen::MatrixXd& L, Eigen::VectorXd& y, const Eigen::VectorXd& b);
-void backward_elimination(const Eigen::MatrixXd& U, Eigen::VectorXd& x, const Eigen::VectorXd& y);
+  /* compute d = H^T * np */
+  for (i = 0; i < n; i++) {
+    sum = 0.0;
+    for (j = 0; j < n; j++) sum += J(j, i) * np(j);
+    d(i) = sum;
+  }
+}
 
-// Utility functions for computing the scalar product and the euclidean
-// distance between two numbers
-double scalar_product(const Eigen::VectorXd& x, const Eigen::VectorXd& y);
-double distance(double a, double b);
+inline void update_z(Eigen::VectorXd& z, const Eigen::MatrixXd& J, const Eigen::VectorXd& d, int iq) {
+  // z = J.rightCols(z.size()-iq) * d.tail(d.size()-iq);
+  register int i, j, n = z.size();
+
+  /* setting of z = H * d */
+  for (i = 0; i < n; i++) {
+    z(i) = 0.0;
+    for (j = iq; j < n; j++) z(i) += J(i, j) * d(j);
+  }
+}
+
+inline void update_r(const Eigen::MatrixXd& R, Eigen::VectorXd& r, const Eigen::VectorXd& d, int iq) {
+  // r.head(iq)= R.topLeftCorner(iq,iq).triangularView<Eigen::Upper>().solve(d.head(iq));
+  register int i, j; /*, n = d.size();*/
+  register double sum;
+
+  /* setting of r = R^-1 d */
+  for (i = iq - 1; i >= 0; i--) {
+    sum = 0.0;
+    for (j = i + 1; j < iq; j++) sum += R(i, j) * r(j);
+    r(i) = (d(i) - sum) / R(i, i);
+  }
+}
+
+bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, int& iq, double& rnorm, double constrTol);
+void delete_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXi& A, Eigen::VectorXd& u, int n, int p, int& iq, int l, const double constrTol);
 
 // Utility functions for printing ublas::vectors and matrices
 void print_matrix(const char* name, const Eigen::MatrixXd& A, int n = -1, int m = -1);
 
-// template<typename T>
-// void print_vector(const char* name, const ublas::vector<T>& v, int n = -1);
+void print_vector(const char* name, const Eigen::VectorXd& v, int n = -1);
 
 // The Solving function, implementing the Goldfarb-Idnani method
-
 SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, Eigen::VectorXd& x, double& f_value) {
   std::ostringstream msg;
@@ -79,19 +119,38 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
     msg << "The vector ci0 is incompatible (incorrect dimension " << ci0.size() << ", expecting " << m << ")";
     throw std::logic_error(msg.str());
   }
-  x.resize(n);
+
+  Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> chol(G.cols());
+
+  double c1;
+
+  /* compute the trace of the original matrix G */
+  c1 = G.trace();
+
+  // decompose the matrix G in the form LL^T
+  chol.compute(G);
+
+  Eigen::MatrixXd L = chol.matrixL();
+
+  return solve_quadprog2(chol, c1, g0, CE, ce0, CI, ci0, x, f_value);
+}
+
+SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, double c1, Eigen::VectorXd& g0,
+                      const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
+                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,
+                      Eigen::VectorXd& x, double& f_value) {
+  /* p is the number of equality constraints */
+  /* m is the number of inequality constraints */
+  const int n = g0.size();
+  const int p = CE.cols();
+  const int m = CI.cols();
+  const double inf = __builtin_inf();
+
   register int i, j, k, l; /* indices */
-  int ip;                  // this is the index of the constraint to be added to the active set
   Eigen::MatrixXd R(n, n), J(n, n);
   Eigen::VectorXd s(m + p), z(n), r(m + p), d(n), np(n), u(m + p), x_old(n), u_old(m + p);
-  double psi, c1, c2, sum, ss, R_norm;
-  double inf;
-  if (std::numeric_limits<double>::has_infinity) {
-    inf = std::numeric_limits<double>::infinity();
-  } else {
-    inf = 1.0E300;
-  }
-
+  double psi, c2, sum, ss, R_norm;
+  int ip;                  // this is the index of the constraint to be added to the active set
   double t, t1, t2;
   /* t is the step length, which is the minimum of the partial step length t1
     * and the full step length t2 */
@@ -101,61 +160,33 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
   int iter = 0;
   Eigen::VectorXi iaexcl(m + p);
 
-/* p is the number of equality constraints */
-/* m is the number of inequality constraints */
-#ifdef TRACE_SOLVER
-  std::cout << std::endl << "Starting solve_quadprog" << std::endl;
-  print_matrix("G", G);
-  print_vector("g0", g0);
-  print_matrix("CE", CE);
-  print_vector("ce0", ce0);
-  print_matrix("CI", CI);
-  print_vector("ci0", ci0);
-#endif  
-  
   /*
    * Preprocessing phase
    */
-	
-  /* compute the trace of the original matrix G */
-  c1 = G.trace();
 
-  /* decompose the matrix G in the form L^T L */
-  cholesky_decomposition(G);
-
-#ifdef TRACE_SOLVER
-  print_matrix("G", G);
-#endif
   /* initialize the matrix R */
   d.setZero();
   R.setZero();
   R_norm = 1.0; /* this variable will hold the norm of the matrix R */
-  
-  /* compute the inverse of the factorized matrix G^-1, this is the initial value for H */
-  c2 = 0.0;
-  for (i = 0; i < n; i++) {
-    d(i) = 1.0;
-    forward_elimination(G, z, d);
-    for (j = 0; j < n; j++) J(i, j) = z(j);
-    c2 += z(i);
-    d(i) = 0.0;
-  }
 
+  /* compute the inverse of the factorized matrix G^-1, this is the initial value for H */
+  // J = L^-T
+  J.setIdentity();
+  J = chol.matrixU().solve(J);
 
 #ifdef TRACE_SOLVER
   print_matrix("J", J);
+  print_vector("d", d);
+  print_matrix("R", R);
 #endif
   
-  /* c1 * c2 is an estimate for cond(G) */
-  
-  /* 
-    * Find the unconstrained minimizer of the quadratic form 0.5 * x G x + g0 x 
+  /*
+   * Find the unconstrained minimizer of the quadratic form 0.5 * x G x + g0 x
    * this is a feasible point in the dual space
    * x = G^-1 * g0
    */
-  cholesky_solve(G, x, g0);
-  for (i = 0; i < n; i++) x(i) = -x(i);
-
+  x = chol.solve(g0);
+  x = -x;
   /* and compute the current solution value */
   f_value = 0.5 * g0.dot(x);
 #ifdef TRACE_SOLVER
@@ -166,7 +197,7 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
   /* Add equality constraints to the working set A */
   iq = 0;
   for (i = 0; i < p; i++) {
-    for (j = 0; j < n; j++) np(j) = CE(j, i);
+    np = CE.col(i);
     compute_d(d, J, np);
     update_z(z, J, d, iq);
     update_r(R, r, d, iq);
@@ -176,26 +207,26 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
     print_vector("r", r, iq);
     print_vector("d", d);
 #endif
-    
     /* compute full step length t2: i.e., the minimum step in primal space s.t. the contraint 
       becomes feasible */
     t2 = 0.0;
-    if (fabs(z.norm()) > MaxConstrTol) {  // i.e. z != 0
+    if (std::fabs(z.norm()) > MaxConstrTol) {  // i.e. z != 0
       t2 = (-np.dot(x) - ce0(i)) / z.dot(np);
     }
 
     /* set x = x + t2 * z */
-    x = x + t2*z; 
+    x += t2 * z; 
 
     /* set u = u+ */
     u(iq) = t2;
-    for (k = 0; k < iq; k++) u(k) -= t2 * r(k);
+    u.head(iq) -= t2 * r.head(iq);
 
     /* compute the new solution value */
     f_value += 0.5 * (t2 * t2) * z.dot(np);
     A(i) = -i - 1;
 
-    if (!add_constraint(R, J, d, iq, R_norm)) {
+    if (!add_constraint(R, J, d, iq, R_norm, MaxConstrTol))
+    {
       // Equality constraints are linearly dependent
       throw std::runtime_error("Constraints are linearly dependent");
       return SolverFlag::kLinearConstr;
@@ -203,7 +234,10 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
   }
 
   /* set iai = K \ A */
-  for (i = 0; i < m; i++) iai(i) = i;
+  for (i = 0; i < m; i++)
+  {
+    iai(i) = i;
+  }
 
 l1:
   iter++;
@@ -218,53 +252,46 @@ l1:
     ip = A(i);
     iai(ip) = -1;
   }
-	
+
   /* compute s[x] = ci^T * x + ci0 for all elements of K \ A */
   ss = 0.0;
   psi = 0.0; /* this value will contain the sum of all infeasibilities */
   ip = 0;    /* ip will be the index of the chosen violated constraint */
   for (i = 0; i < m; i++) {
     iaexcl(i) = true;
-    sum = 0.0;
-    for (j = 0; j < n; j++) sum += CI(j, i) * x(j);
-    sum += ci0(i);
+    sum = CI.col(i).dot(x) + ci0(i);
     s(i) = sum;
     psi += std::min(0.0, sum);
   }
 #ifdef TRACE_SOLVER
   print_vector("s", s, m);
 #endif
-
-  if (fabs(psi) <= m * MaxConstrTol * c1 * c2 * 100.0) {
+  if (fabs(psi) <= MaxConstrTol) {
     /* numerically there are not infeasibilities anymore */
     // q = iq;
-
     return SolverFlag::kSolveSuccess;
   }
 
   /* save old values for u and A */
-  for (i = 0; i < iq; i++) {
-    u_old(i) = u(i);
-    A_old(i) = A(i);
-  }
-  /* and for x */
-  for (i = 0; i < n; i++) x_old(i) = x(i);
+  u_old.head(iq) = u.head(iq);
+  A_old.head(iq) = A.head(iq);
+  x_old = x;
 
 l2: /* Step 2: check for feasibility and determine a new S-pair */
   for (i = 0; i < m; i++) {
-    if (s(i) < ss && iai(i) != -1 && iaexcl(i)) {
+    if ((s(i) < ss) && (iai(i) != -1) && iaexcl(i))
+    {
       ss = s(i);
       ip = i;
     }
   }
   if (ss >= 0.0) {
     // q = iq;
-
     return SolverFlag::kInfeasibleConstr;
   }
   
   /* set np = n(ip) */
-  for (i = 0; i < n; i++) np(i) = CI(i, ip);
+  np = CI.col(ip);
   /* set u = [u 0]^T */
   u(iq) = 0.0;
   /* add ip to the active set A */
@@ -274,21 +301,13 @@ l2: /* Step 2: check for feasibility and determine a new S-pair */
   std::cout << "Trying with constraint " << ip << std::endl;
   print_vector("np", np);
 #endif
-  
+
 l2a:/* Step 2a: determine step direction */
     /* compute z = H np: the step direction in the primal space (through J, see the paper) */
   compute_d(d, J, np);
   update_z(z, J, d, iq);
   /* compute N* np (if q > 0): the negative of the step direction in the dual space */
   update_r(R, r, d, iq);
-#ifdef TRACE_SOLVER
-  std::cout << "Step direction z" << std::endl;
-  print_vector("z", z);
-  print_vector("r", r, iq + 1);
-  print_vector("u", u, iq + 1);
-  print_vector("d", d);
-  print_vector("A", A, iq + 1);
-#endif
   
   /* Step 2b: compute step length */
   l = 0;
@@ -304,9 +323,9 @@ l2a:/* Step 2a: determine step direction */
     }
   }
   /* Compute t2: full step length (minimum step in primal space such that the constraint ip becomes feasible */
-  if (fabs(scalar_product(z, z))  > MaxConstrTol) // i.e. z != 0
+  if (std::fabs(z.dot(z))  > MaxConstrTol) // i.e. z != 0
   {
-    t2 = -s(ip) / scalar_product(z, np);
+    t2 = -s(ip) / z.dot(np);
     if (t2 < 0) // patch suggested by Takano Akio for handling numerical inconsistencies
       t2 = inf;
   } else {
@@ -324,44 +343,27 @@ l2a:/* Step 2a: determine step direction */
   /* case (i): no step in primal or dual space */
   if (t >= inf) {
     /* QPP is infeasible */
-    // FIXME: unbounded to raise
-    // q = iq;
     return SolverFlag::kInfeasibleConstr;
   }
   /* case (ii): step in dual space */
   if (t2 >= inf) {
     /* set u = u +  t * (-r 1) and drop constraint l from the active set A */
-    for (k = 0; k < iq; k++) u(k) -= t * r(k);
+    u.head(iq) -= t * r.head(iq);
     u(iq) += t;
     iai(l) = l;
-    delete_constraint(R, J, A, u, n, p, iq, l);
-#ifdef TRACE_SOLVER
-    std::cout << " in dual space: " 
-      << f_value << std::endl;
-    print_vector("x", x);
-    print_vector("z", z);
-    print_vector("A", A, iq + 1);
-#endif
+    delete_constraint(R, J, A, u, n, p, iq, l, MaxConstrTol);
     goto l2a;
   }
 
   /* case (iii): step in primal and dual space */
 
   /* set x = x + t * z */
-  for (k = 0; k < n; k++) x(k) += t * z(k);
+  x += t * z;
   /* update the solution value */
-  f_value += t * scalar_product(z, np) * (0.5 * t + u(iq));
+  f_value += t * z.dot(np) * (0.5 * t + u(iq));
   /* u = u + t * (-r 1) */
-  for (k = 0; k < iq; k++) u(k) -= t * r(k);
+  u.head(iq) -= t * r.head(iq);
   u(iq) += t;
-#ifdef TRACE_SOLVER
-  std::cout << " in both spaces: " 
-    << f_value << std::endl;
-  print_vector("x", x);
-  print_vector("u", u, iq + 1);
-  print_vector("r", r, iq + 1);
-  print_vector("A", A, iq + 1);
-#endif
   
   if (fabs(t - t2) < MaxConstrTol)
   {
@@ -371,31 +373,24 @@ l2a:/* Step 2a: determine step direction */
 #endif
     /* full step has taken */
     /* add constraint ip to the active set*/
-    if (!add_constraint(R, J, d, iq, R_norm))
+    if (!add_constraint(R, J, d, iq, R_norm, MaxConstrTol))
     {
       iaexcl(ip) = false;
-      delete_constraint(R, J, A, u, n, p, iq, ip);
-#ifdef TRACE_SOLVER
-      print_matrix("R", R);
-      print_vector("A", A, iq);
-			print_vector("iai", iai);
-#endif
+      delete_constraint(R, J, A, u, n, p, iq, ip, MaxConstrTol);
       for (i = 0; i < m; i++) iai(i) = i;
-      for (i = p; i < iq; i++) {
+      for (i = p; i < iq; i++)
+      {
         A(i) = A_old(i);
         u(i) = u_old(i);
         iai(A(i)) = -1;
       }
-      for (i = 0; i < n; i++) x(i) = x_old(i);
+      x = x_old;
       goto l2; /* go to step 2 */
-    } else {
+    }
+    else {
       iai(ip) = -1;
     }
-#ifdef TRACE_SOLVER
-    print_matrix("R", R);
-    print_vector("A", A, iq);
-		print_vector("iai", iai);
-#endif
+
     goto l1;
   }
   
@@ -406,58 +401,19 @@ l2a:/* Step 2a: determine step direction */
 #endif
   /* drop constraint l */
   iai(l) = l;
-  delete_constraint(R, J, A, u, n, p, iq, l);
+  delete_constraint(R, J, A, u, n, p, iq, l, MaxConstrTol);
 #ifdef TRACE_SOLVER
   print_matrix("R", R);
-  print_vector("A", A, iq);
+  // print_vector("A", A, iq);
 #endif
-
   /* update s(ip) = CI * x + ci0 */
-  sum = 0.0;
-  for (k = 0; k < n; k++) sum += CI(k, ip) * x(k);
-  s(ip) = sum + ci0(ip);
+  s(ip) = CI.col(ip).dot(x) + ci0(ip);
 
-#ifdef TRACE_SOLVER
-  print_vector("s", s, m);
-#endif
   goto l2a;
 }
 
-inline void compute_d(Eigen::VectorXd& d, const Eigen::MatrixXd& J, const Eigen::VectorXd& np) {
-  register int i, j, n = d.size();
-  register double sum;
 
-  /* compute d = H^T * np */
-  for (i = 0; i < n; i++) {
-    sum = 0.0;
-    for (j = 0; j < n; j++) sum += J(j, i) * np(j);
-    d(i) = sum;
-  }
-}
-
-inline void update_z(Eigen::VectorXd& z, const Eigen::MatrixXd& J, const Eigen::VectorXd& d, int iq) {
-  register int i, j, n = z.size();
-
-  /* setting of z = H * d */
-  for (i = 0; i < n; i++) {
-    z(i) = 0.0;
-    for (j = iq; j < n; j++) z(i) += J(i, j) * d(j);
-  }
-}
-
-inline void update_r(const Eigen::MatrixXd& R, Eigen::VectorXd& r, const Eigen::VectorXd& d, int iq) {
-  register int i, j; /*, n = d.size();*/
-  register double sum;
-
-  /* setting of r = R^-1 d */
-  for (i = iq - 1; i >= 0; i--) {
-    sum = 0.0;
-    for (j = i + 1; j < iq; j++) sum += R(i, j) * r(j);
-    r(i) = (d(i) - sum) / R(i, i);
-  }
-}
-
-bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, int& iq, double& R_norm) {
+bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, int& iq, double& R_norm, double constrTol) {
   int n = d.size();
 #ifdef TRACE_SOLVER
   std::cout << "Add constraint " << iq << '/';
@@ -481,7 +437,7 @@ bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, 
     cc = d(j - 1);
     ss = d(j);
     h = distance(cc, ss);
-    if (fabs(h) < std::numeric_limits<double>::epsilon())  // h == 0
+    if (fabs(h) < constrTol)  // h == 0
       continue;
     d(j) = 0.0;
     ss = ss / h;
@@ -514,7 +470,7 @@ bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, 
   print_vector("d", d, iq);
 #endif
 
-  if (fabs(d(iq - 1)) <= std::numeric_limits<double>::epsilon() * R_norm) {
+  if (fabs(d(iq - 1)) <= constrTol * R_norm) {
     // problem degenerate
     return false;
   }
@@ -523,7 +479,7 @@ bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, 
 }
 
 void delete_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXi& A, Eigen::VectorXd& u, int n, int p,
-                       int& iq, int l) {
+                       int& iq, int l, const double constrTol) {
 #ifdef TRACE_SOLVER
   std::cout << "Delete constraint " << l << ' ' << iq;
 #endif
@@ -561,7 +517,7 @@ void delete_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXi& 
     cc = R(j, j);
     ss = R(j + 1, j);
     h = distance(cc, ss);
-    if (fabs(h) < std::numeric_limits<double>::epsilon())  // h == 0
+    if (fabs(h) < constrTol)  // h == 0
       continue;
     cc = cc / h;
     ss = ss / h;
@@ -590,92 +546,7 @@ void delete_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXi& 
   }
 }
 
-inline double distance(double a, double b) {
-  register double a1, b1, t;
-  a1 = fabs(a);
-  b1 = fabs(b);
-  if (a1 > b1) {
-    t = (b1 / a1);
-    return a1 * sqrt(1.0 + t * t);
-  }
-  else
-    if (b1 > a1)
-    {
-      t = (a1 / b1);
-      return b1 * sqrt(1.0 + t * t);
-    }
-  return a1 * sqrt(2.0);
-}
-
-inline double scalar_product(const Eigen::VectorXd& x, const Eigen::VectorXd& y) {
-  register int i, n = x.size();
-  register double sum;
-
-  sum = 0.0;
-  for (i = 0; i < n; i++) sum += x(i) * y(i);
-  return sum;
-}
-
-void cholesky_decomposition(Eigen::MatrixXd& A) {
-  register int i, j, k, n = A.rows();
-  register double sum;
-
-  for (i = 0; i < n; i++) {
-    for (j = i; j < n; j++) {
-      sum = A(i, j);
-      for (k = i - 1; k >= 0; k--) sum -= A(i, k) * A(j, k);
-      if (i == j) {
-        if (sum <= 0.0) {
-          std::ostringstream os;
-          // raise error
-          print_matrix("A", A);
-          os << "Error in cholesky decomposition, sum: " << sum;
-          throw std::logic_error(os.str());
-          exit(-1);
-        }
-        A(i, i) = ::std::sqrt(sum);
-      } else {
-        A(j, i) = sum / A(i, i);
-      }
-    }
-    for (k = i + 1; k < n; k++) A(i, k) = A(k, i);
-  }
-}
-
-void cholesky_solve(const Eigen::MatrixXd& L, Eigen::VectorXd& x, const Eigen::VectorXd& b) {
-  int n = L.rows();
-  Eigen::VectorXd y(n);
-
-  /* Solve L * y = b */
-  forward_elimination(L, y, b);
-  /* Solve L^T * x = y */
-  backward_elimination(L, x, y);
-}
-
-inline void forward_elimination(const Eigen::MatrixXd& L, Eigen::VectorXd& y, const Eigen::VectorXd& b) {
-  register int i, j, n = L.rows();
-
-  y(0) = b(0) / L(0, 0);
-  for (i = 1; i < n; i++) {
-    y(i) = b(i);
-    for (j = 0; j < i; j++) y(i) -= L(i, j) * y(j);
-    y(i) = y(i) / L(i, i);
-  }
-}
-
-inline void backward_elimination(const Eigen::MatrixXd& U, Eigen::VectorXd& x, const Eigen::VectorXd& y) {
-  register int i, j, n = U.rows();
-
-  x(n - 1) = y(n - 1) / U(n - 1, n - 1);
-  for (i = n - 2; i >= 0; i--) {
-    x(i) = y(i);
-    for (j = i + 1; j < n; j++) x(i) -= U(i, j) * x(j);
-    x(i) = x(i) / U(i, i);
-  }
-}
-
-void print_matrix(const char* name, const Eigen::MatrixXd& A, int n, int m)
-{
+void print_matrix(const char* name, const Eigen::MatrixXd& A, int n, int m) {
   std::ostringstream s;
   std::string t;
   if (n == -1)
@@ -697,23 +568,22 @@ void print_matrix(const char* name, const Eigen::MatrixXd& A, int n, int m)
   std::cout << t << std::endl;
 }
 
-// template<typename T>
-// void print_vector(const char* name, const Vector<T>& v, int n)
-// {
-//   std::ostringstream s;
-//   std::string t;
-//   if (n == -1)
-//     n = v.size();
-	
-//   s << name << ": " << std::endl << " ";
-//   for (int i = 0; i < n; i++)
-//   {
-//     s << v(i) << ", ";
-//   }
-//   t = s.str();
-//   t = t.substr(0, t.size() - 2); // To remove the trailing space and comma
-	
-//   std::cout << t << std::endl;
-// }
+void print_vector(const char* name, const Eigen::VectorXd& v, int n)
+{
+ std::ostringstream s;
+ std::string t;
+ if (n == -1)
+   n = v.size();
+
+ s << name << ": " << std::endl << " ";
+ for (int i = 0; i < n; i++)
+ {
+   s << v(i) << ", ";
+ }
+ t = s.str();
+ t = t.substr(0, t.size() - 2); // To remove the trailing space and comma
+
+ std::cout << t << std::endl;
+}
 
 }  // namespace quadprogpp

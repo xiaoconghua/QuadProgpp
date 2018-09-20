@@ -76,13 +76,13 @@ enum class SolverFlag {
 };
 
 SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0,
-                      const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,  
-                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, 
+                      const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
+                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,
                       Eigen::VectorXd& x, double& f_value);
 
 SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, double c1, Eigen::VectorXd& g0,
-                      const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,  
-                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, 
+                      const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
+                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,
                       Eigen::VectorXd& x, double& f_value);
 
 }  // namespace quadprog_eigen

@@ -130,8 +130,6 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
   // decompose the matrix G in the form LL^T
   chol.compute(G);
 
-  Eigen::MatrixXd L = chol.matrixL();
-
   return solve_quadprog2(chol, c1, g0, CE, ce0, CI, ci0, x, f_value);
 }
 
@@ -146,10 +144,10 @@ SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, doub
   const int m = CI.cols();
   const double inf = __builtin_inf();
 
-  register int i, j, k, l; /* indices */
+  register int i, k, l; /* indices */
   Eigen::MatrixXd R(n, n), J(n, n);
   Eigen::VectorXd s(m + p), z(n), r(m + p), d(n), np(n), u(m + p), x_old(n), u_old(m + p);
-  double psi, c2, sum, ss, R_norm;
+  double psi, sum, ss, R_norm;
   int ip;                  // this is the index of the constraint to be added to the active set
   double t, t1, t2;
   /* t is the step length, which is the minimum of the partial step length t1

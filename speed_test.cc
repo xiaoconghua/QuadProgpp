@@ -126,13 +126,14 @@ int main (int argc, char *const argv[]) {
   }
   btime::time_duration toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of eigen QP: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+  std::cout << "obj: " << objVal << "\nx: \n" << ex << "\n\n";
   // std::cout << "Equality violation: " << std::endl;
   // std::cout << eCE*ex + ece0 << std::endl;
   // std::cout << "Inequality violation: " << std::endl;
   // std::cout << eCI*ex + eci0 << std::endl;
 
   // Solving use a different Eigen
+  int iter = 0;
   quadprog_eigen::SolverFlag solver_flag;
   tic = btime::microsec_clock::local_time();
   for (int i = 0; i < count; ++i) {
@@ -141,7 +142,7 @@ int main (int argc, char *const argv[]) {
     eG_test2 = eG;
     eg0_test2 = eg0;
   	ex.setZero();
-    solver_flag = quadprog_eigen::solve_quadprog(eG_test2, eg0_test2, eCE.transpose(), ece0, eCI.transpose(), eci0, ex, objVal);
+    solver_flag = quadprog_eigen::solve_quadprog(eG_test2, eg0_test2, eCE.transpose(), ece0, eCI.transpose(), eci0, ex, objVal, iter);
   }
   switch(solver_flag) {
     case quadprog_eigen::SolverFlag::kReachMaxIter:
@@ -160,7 +161,7 @@ int main (int argc, char *const argv[]) {
 
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprog eigen: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+  std::cout << "obj: " << objVal << "\nx: \n" << ex << "\niter:" << iter << "\n\n";
   // std::cout << "Equality violation: " << std::endl;
   // std::cout << eCE*ex + ece0 << std::endl;
   // std::cout << "Inequality violation: " << std::endl;
@@ -186,7 +187,7 @@ int main (int argc, char *const argv[]) {
     Eigen::VectorXd eg0_test3(n);
     eg0_test3 = eg0;
     ex.setZero();
-    solver_flag = quadprog_eigen::solve_quadprog2(chol, c1, eg0_test3, eCE.transpose(), ece0, eCI.transpose(), eci0, ex, objVal);
+    solver_flag = quadprog_eigen::solve_quadprog2(chol, c1, eg0_test3, eCE.transpose(), ece0, eCI.transpose(), eci0, ex, objVal, iter);
   }
   switch(solver_flag) {
     case quadprog_eigen::SolverFlag::kReachMaxIter:
@@ -205,7 +206,7 @@ int main (int argc, char *const argv[]) {
 
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprog eigen with one computation of cholosky decomposition: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+  std::cout << "obj: " << objVal << "\nx: \n" << ex << "\niter:" << iter<< "\n\n";
   // std::cout << "Equality violation: " << std::endl;
   // std::cout << eCE*ex + ece0 << std::endl;
   // std::cout << "Inequality violation: " << std::endl;

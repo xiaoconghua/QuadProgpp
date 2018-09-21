@@ -90,8 +90,8 @@ void print_matrix(const char* name, const Eigen::MatrixXd& A, int n = -1, int m 
 void print_vector(const char* name, const Eigen::VectorXd& v, int n = -1);
 
 // The Solving function, implementing the Goldfarb-Idnani method
-SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
-                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, Eigen::VectorXd& x, double& f_value) {
+SolverFlag solve_quadprog(const Eigen::MatrixXd& G, const Eigen::VectorXd& g0, const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
+                      const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0, Eigen::VectorXd& x, double& f_value, int& iter) {
   std::ostringstream msg;
   int n = G.cols(), p = CE.cols(), m = CI.cols();
   if (G.rows() != n)
@@ -130,19 +130,23 @@ SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0, const Eigen::
   // decompose the matrix G in the form LL^T
   chol.compute(G);
 
-  return solve_quadprog2(chol, c1, g0, CE, ce0, CI, ci0, x, f_value);
+  return solve_quadprog2(chol, c1, g0, CE, ce0, CI, ci0, x, f_value, iter);
 }
 
-SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, double c1, Eigen::VectorXd& g0,
+SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, const  double c1, const  Eigen::VectorXd& g0,
                       const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,
-                      Eigen::VectorXd& x, double& f_value) {
+                      Eigen::VectorXd& x, double& f_value, int& iter) {
   /* p is the number of equality constraints */
   /* m is the number of inequality constraints */
   const int n = g0.size();
   const int p = CE.cols();
   const int m = CI.cols();
   const double inf = __builtin_inf();
+
+  /* Initialize the two return values */
+  iter = 0;
+  f_value = 0;
 
   register int i, k, l; /* indices */
   Eigen::MatrixXd R(n, n), J(n, n);
@@ -155,7 +159,6 @@ SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, doub
   Eigen::VectorXi A(m + p), A_old(m + p), iai(m + p);
   // int q = 0;  /* size of the active set A (containing the indices of the active constraints) */
   int iq = 0;
-  int iter = 0;
   Eigen::VectorXi iaexcl(m + p);
 
   /*

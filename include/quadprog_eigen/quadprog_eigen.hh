@@ -75,15 +75,15 @@ enum class SolverFlag {
   kLinearConstr = -2,
 };
 
-SolverFlag solve_quadprog(Eigen::MatrixXd& G, Eigen::VectorXd& g0,
+SolverFlag solve_quadprog(const Eigen::MatrixXd& G, const Eigen::VectorXd& g0,
                       const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,
-                      Eigen::VectorXd& x, double& f_value);
+                      Eigen::VectorXd& x, double& f_value, int& iter);
 
-SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, double c1, Eigen::VectorXd& g0,
+SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, const double c1, const Eigen::VectorXd& g0,
                       const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,
-                      Eigen::VectorXd& x, double& f_value);
+                      Eigen::VectorXd& x, double& f_value, int& iter);
 
 }  // namespace quadprog_eigen
 

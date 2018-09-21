@@ -82,11 +82,13 @@ int main (int argc, char *const argv[]) {
   double objVal;
   for (int i = 0; i < count; ++i)
   {
-	objVal = quadprogpp::solve_quadprog(G, g0, CE, ce0, CI, ci0, x);
+    quadprogpp::Matrix<double> G(GInput, n, n);
+    quadprogpp::Vector<double> g0(g0Input, n);
+	  objVal = quadprogpp::solve_quadprog(G, g0, CE, ce0, CI, ci0, x);
   }
   btime::time_duration toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprogpp: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << x << "\n\n";
+  std::cout << "obj: " << objVal << "\nx: \n" << x << "\n\n";
   
 
   // Initialize the matrix to pass to quadprog solver.
@@ -125,6 +127,7 @@ int main (int argc, char *const argv[]) {
   }
 
   quadprog_eigen::SolverFlag solver_flag;
+  int iter = 0;
   tic = btime::microsec_clock::local_time();
   for (int i = 0; i < count; ++i) {
     for (int i = 0; i < n; i++) {
@@ -135,7 +138,7 @@ int main (int argc, char *const argv[]) {
       ex(i) = x0Input[i];
     }
   	ex.setZero();
-    solver_flag = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex, objVal);
+    solver_flag = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex, objVal, iter);
   }
   switch(solver_flag) {
     case quadprog_eigen::SolverFlag::kReachMaxIter:
@@ -154,7 +157,7 @@ int main (int argc, char *const argv[]) {
 
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprog eigen: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+  std::cout << "obj: " << objVal << "\nx: \n" << ex  << "\niter:" << iter << "\n\n";
 
   tic = btime::microsec_clock::local_time();
   for (int i = 0; i < count; ++i) {
@@ -170,5 +173,5 @@ int main (int argc, char *const argv[]) {
   }
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of eigen QP: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
-  std::cout << "obj: " << objVal << "\nx: " << ex << "\n\n";
+  std::cout << "obj: " << objVal << "\nx: \n" << ex << "\n\n";
 }

@@ -43,7 +43,7 @@ inline double distance(double a, double b) {
   return a1 * sqrt(2.0);
 }
 
-// Utility functions for updating some data needed by the solution method 
+// Utility functions for updating some data needed by the solution method
 inline void compute_d(Eigen::VectorXd& d, const Eigen::MatrixXd& J, const Eigen::VectorXd& np) {
   // d = J.adjoint() * np;
   register int i, j, n = d.size();
@@ -180,7 +180,7 @@ SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, cons
   print_vector("d", d);
   print_matrix("R", R);
 #endif
-  
+
   /*
    * Find the unconstrained minimizer of the quadratic form 0.5 * x G x + g0 x
    * this is a feasible point in the dual space
@@ -208,7 +208,7 @@ SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, cons
     print_vector("r", r, iq);
     print_vector("d", d);
 #endif
-    /* compute full step length t2: i.e., the minimum step in primal space s.t. the contraint 
+    /* compute full step length t2: i.e., the minimum step in primal space s.t. the contraint
       becomes feasible */
     t2 = 0.0;
     if (std::fabs(z.norm()) > MaxConstrTol) {  // i.e. z != 0
@@ -216,7 +216,7 @@ SolverFlag solve_quadprog2(Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> &chol, cons
     }
 
     /* set x = x + t2 * z */
-    x += t2 * z; 
+    x += t2 * z;
 
     /* set u = u+ */
     u(iq) = t2;
@@ -290,14 +290,14 @@ l2: /* Step 2: check for feasibility and determine a new S-pair */
     // q = iq;
     return SolverFlag::kInfeasibleConstr;
   }
-  
+
   /* set np = n(ip) */
   np = CI.col(ip);
   /* set u = [u 0]^T */
   u(iq) = 0.0;
   /* add ip to the active set A */
   A(iq) = ip;
-  
+
 #ifdef TRACE_SOLVER
   std::cout << "Trying with constraint " << ip << std::endl;
   print_vector("np", np);
@@ -309,7 +309,7 @@ l2a:/* Step 2a: determine step direction */
   update_z(z, J, d, iq);
   /* compute N* np (if q > 0): the negative of the step direction in the dual space */
   update_r(R, r, d, iq);
-  
+
   /* Step 2b: compute step length */
   l = 0;
   /* Compute t1: partial step length (maximum step in dual space without violating dual feasibility */
@@ -365,7 +365,7 @@ l2a:/* Step 2a: determine step direction */
   /* u = u + t * (-r 1) */
   u.head(iq) -= t * r.head(iq);
   u(iq) += t;
-  
+
   if (fabs(t - t2) < MaxConstrTol)
   {
 #ifdef TRACE_SOLVER
@@ -394,7 +394,7 @@ l2a:/* Step 2a: determine step direction */
 
     goto l1;
   }
-  
+
   /* a patial step has taken */
 #ifdef TRACE_SOLVER
   std::cout << "Partial step has taken " << t << std::endl;
@@ -429,8 +429,8 @@ bool add_constraint(Eigen::MatrixXd& R, Eigen::MatrixXd& J, Eigen::VectorXd& d, 
   for (j = n - 1; j >= iq + 1; j--) {
     /* The Givens rotation is done with the ublas::matrix (cc cs, cs -cc).
     If cc is one, then element (j) of d is zero compared with element
-    (j - 1). Hence we don't have to do anything. 
-    If cc is zero, then we just have to switch column (j) and column (j - 1) 
+    (j - 1). Hence we don't have to do anything.
+    If cc is zero, then we just have to switch column (j) and column (j - 1)
     of J. Since we only switch columns in J, we have to be careful how we
     update d depending on the sign of gs.
     Otherwise we have to apply the Givens rotation to these columns.
@@ -554,7 +554,7 @@ void print_matrix(const char* name, const Eigen::MatrixXd& A, int n, int m) {
     n = A.rows();
   if (m == -1)
     m = A.cols();
-	
+
   s << name << ": " << std::endl;
   for (int i = 0; i < n; i++)
   {
@@ -565,7 +565,7 @@ void print_matrix(const char* name, const Eigen::MatrixXd& A, int n, int m) {
   }
   t = s.str();
   t = t.substr(0, t.size() - 3); // To remove the trailing space, comma and newline
-	
+
   std::cout << t << std::endl;
 }
 

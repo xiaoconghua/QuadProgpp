@@ -53,7 +53,6 @@ int main (int argc, char *const argv[]) {
   int count = 1000000;
 
   btime::ptime tic = btime::microsec_clock::local_time();
-  
 
   // Initialize the matrix to pass to quadprog solver.
   Eigen::MatrixXd eG(n, n);
@@ -175,7 +174,7 @@ int main (int argc, char *const argv[]) {
 
   Eigen::LLT<Eigen::MatrixXd, Eigen::Lower> chol(eG_test3.cols());
 
-  double c1; 
+  double c1;
 
   /* compute the trace of the original matrix G */
   c1 = eG_test3.trace();

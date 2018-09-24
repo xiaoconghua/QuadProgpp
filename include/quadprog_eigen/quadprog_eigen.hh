@@ -75,6 +75,15 @@ enum class SolverFlag {
   kLinearConstr = -2,
 };
 
+static inline std::map<SolverFlag, std::string> SolverFlagMapper() {
+  return {
+    {SolverFlag::kReachMaxIter, "kReachMaxIter"},
+    {SolverFlag::kSolveSuccess, "kSolveSuccess"},
+    {SolverFlag::kInfeasibleConstr, "kInfeasibleConstr"},
+    {SolverFlag::kLinearConstr, "kLinearConstr"},
+  };
+}
+
 SolverFlag solve_quadprog(const Eigen::MatrixXd& G, const Eigen::VectorXd& g0,
                       const Eigen::MatrixXd& CE, const Eigen::VectorXd& ce0,
                       const Eigen::MatrixXd& CI, const Eigen::VectorXd& ci0,

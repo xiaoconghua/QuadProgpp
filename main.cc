@@ -140,20 +140,7 @@ int main (int argc, char *const argv[]) {
   	ex.setZero();
     solver_flag = quadprog_eigen::solve_quadprog(eG, eg0, eCE, ece0, eCI, eci0, ex, objVal, iter);
   }
-  switch(solver_flag) {
-    case quadprog_eigen::SolverFlag::kReachMaxIter:
-      std::cout << "Reaches Maximum Iteration." << std::endl;
-      break;
-    case quadprog_eigen::SolverFlag::kSolveSuccess:
-      std::cout << "Solve Success." << std::endl;
-      break;
-    case quadprog_eigen::SolverFlag::kInfeasibleConstr:
-      std::cout << "Infeasible Constraints." << std::endl;
-      break;
-    case quadprog_eigen::SolverFlag::kLinearConstr:
-      std::cout << "Infeasible Constraints." << std::endl;
-      break;
-  }
+  std::cout << "Solver status: " << quadprog_eigen::SolverFlagMapper()[solver_flag] << std::endl;
 
   toc = btime::microsec_clock::local_time() - tic;
   std::cout << "Elapsed time of quadprog eigen: " << std::setprecision(8) << toc.total_milliseconds() << " ms\n";
